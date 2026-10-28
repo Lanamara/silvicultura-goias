@@ -58,6 +58,8 @@ th:first-child,td:first-child{text-align:left}
 .leaflet-popup-content table{min-width:190px}
 .pixelado{image-rendering:pixelated}
 .pix{margin-top:8px;padding-top:6px;border-top:1px solid var(--line);font-size:12.5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.pix.sub{border-top:0;margin-top:2px;padding-top:0}
+.pix .obs{flex-basis:100%;color:var(--muted);font-size:11px;padding-left:18px}
 .pix i{width:12px;height:12px;border-radius:2px;border:1px solid rgba(0,0,0,.2);display:inline-block}
 .seg button:disabled{cursor:not-allowed}
 h2.hi{display:flex;align-items:center;justify-content:space-between;gap:8px}
@@ -100,7 +102,7 @@ h2.hi{display:flex;align-items:center;justify-content:space-between;gap:8px}
 
     <section>
       <h2 class="hi">Mapas de pixel · estado inteiro<button class="ib" type="button" aria-label="Sobre esta seção" aria-expanded="false">i</button></h2>
-      <div class="info" hidden><b>Concordância MB × TC</b>: cada pixel de 30 m com silvicultura nos dois mapas (verde), só no MapBiomas (laranja) ou só no TerraClass (azul), na porção de Goiás no Cerrado. <b>TerraClass</b>: uso e cobertura do TerraClass Cerrado (INPE/Embrapa), legenda oficial do produto. <b>MapBiomas</b>: uso e cobertura da Coleção 11, legenda oficial. Ao afastar o zoom aparece uma visão geral simplificada (pixels de cerca de 200 m, pela classe mais frequente; na concordância, a silvicultura é mantida mesmo quando ocupa só parte do pixel). A partir do zoom 9 a página carrega o detalhe da área visível (concordância a 30 m; TerraClass e MapBiomas a 60 m, pela classe mais frequente). Clique no mapa para ver a classe do pixel.</div>
+      <div class="info" hidden><b>Concordância MB × TC</b>: cada pixel de 30 m com silvicultura nos dois mapas (verde), só no MapBiomas (laranja) ou só no TerraClass (azul), na porção de Goiás no Cerrado. <b>TerraClass</b>: uso e cobertura do TerraClass Cerrado (INPE/Embrapa), legenda oficial do produto. <b>MapBiomas</b>: uso e cobertura da Coleção 11, legenda oficial. Ao afastar o zoom aparece uma visão geral simplificada (pixels de cerca de 200 m, pela classe mais frequente; na concordância, a silvicultura é mantida mesmo quando ocupa só parte do pixel). A partir do zoom 9 a página carrega o detalhe da área visível (concordância a 30 m; TerraClass e MapBiomas a 60 m, pela classe mais frequente). Clique no mapa para ver a classe do pixel. Na concordância, quando a silvicultura aparece só em um dos mapas, o popup mostra também a classe que o outro mapa deu àquele ponto (lida no mapa de 60 m, ou seja, a classe predominante no entorno).</div>
       <div class="linha"><label><input type="checkbox" id="estOn" checked> Mostrar no mapa</label></div>
       <div class="seg" id="estProd" style="margin-top:8px">
         <button data-p="conc" class="on">Concordância</button>
@@ -291,7 +293,8 @@ const geo = L.geoJSON(MUNICIPIOS, {
     lyr.on('mouseout',  () => geo.resetStyle(lyr));
     lyr.on('click', e => {
       selecionado = f.properties.cd; geo.setStyle(estilo);
-      L.popup({autoPanPaddingTopLeft:[window.innerWidth>640?370:10,10], autoPanPaddingBottomRight:[70,10]}).setLatLng(e.latlng).setContent(popup(f.properties) + textoPixel(e.latlng)).openOn(map);
+      const pop = L.popup({autoPanPaddingTopLeft:[window.innerWidth>640?370:10,10], autoPanPaddingBottomRight:[70,10]}).setLatLng(e.latlng).setContent(popup(f.properties) + textoPixel(e.latlng)).openOn(map);
+      complementarPopup(pop, e.latlng);
       graficoMunicipio(f.properties);
     });
   }
@@ -541,9 +544,46 @@ function textoPixel(latlng){
   const k = Object.keys(prod.classes).find(k=>prod.classes[k].cor.toLowerCase()===hex);
   return `<div class="pix"><i style="background:${hex}"></i>${prod.titulo} ${estAno}: <b>${k ? prod.classes[k].nome : 'classe não identificada'}</b></div>`;
 }
+// classe do OUTRO mapa nas áreas discordantes (lê as partes de 60 m sob demanda)
+const imgCache = {};
+function carregarParte(arq){
+  if (!imgCache[arq]) imgCache[arq] = new Promise((res, rej)=>{
+    const im = new Image();
+    im.onload = ()=>{ const c = document.createElement('canvas'); c.width = im.naturalWidth; c.height = im.naturalHeight;
+      const cx = c.getContext('2d', {willReadFrequently:true}); cx.drawImage(im,0,0); res({cx, w:im.naturalWidth, h:im.naturalHeight}); };
+    im.onerror = rej; im.src = 'img/estado/'+arq;
+  });
+  return imgCache[arq];
+}
+async function classeEm(prodId, ano, latlng){
+  const prod = EST[prodId], d = prod && prod.anos[ano]; if (!d) return null;
+  const parte = d.partes.find(p=>L.latLngBounds(p.bounds).contains(latlng)); if (!parte) return null;
+  const {cx, w, h} = await carregarParte(parte.arq);
+  const crs = L.CRS.EPSG3857, b = L.latLngBounds(parte.bounds);
+  const p = crs.project(latlng), sw = crs.project(b.getSouthWest()), ne = crs.project(b.getNorthEast());
+  const x = Math.min(w-1, Math.floor((p.x-sw.x)/(ne.x-sw.x)*w)), y = Math.min(h-1, Math.floor((ne.y-p.y)/(ne.y-sw.y)*h));
+  const px = cx.getImageData(x, y, 1, 1).data;
+  if (px[3] === 0) return null;
+  const hex = '#'+[px[0],px[1],px[2]].map(v=>v.toString(16).padStart(2,'0')).join('');
+  const k = Object.keys(prod.classes).find(k=>prod.classes[k].cor.toLowerCase()===hex);
+  return k ? {codigo:+k, nome:prod.classes[k].nome, cor:hex} : null;
+}
+async function complementarPopup(pop, latlng){
+  if (!estOn || estProd !== 'conc') return;
+  try {
+    const c = await classeEm('conc', estAno, latlng); if (!c || c.codigo === 1) return;
+    const outro = c.codigo === 2 ? 'TC' : 'MB';
+    const k = await classeEm(outro, estAno, latlng);
+    const txt = k
+      ? `<div class="pix sub"><i style="background:${k.cor}"></i>↳ no ${EST[outro].titulo} ${estAno}: <b>${k.nome}</b><span class="obs">classe predominante em 60 m</span></div>`
+      : `<div class="pix sub">↳ no ${EST[outro].titulo} ${estAno}: sem classe neste ponto</div>`;
+    if (map.hasLayer(pop)) pop.setContent(pop.getContent() + txt);
+  } catch(err){ /* arquivo local: o navegador bloqueia a leitura */ }
+}
 map.on('click', e=>{
   if (CAMADAS.mun.on) return;
-  const t = textoPixel(e.latlng); if (t) L.popup().setLatLng(e.latlng).setContent(t).openOn(map);
+  const t = textoPixel(e.latlng);
+  if (t){ const pop = L.popup().setLatLng(e.latlng).setContent(t).openOn(map); complementarPopup(pop, e.latlng); }
 });
 atualizarEstado();
 
