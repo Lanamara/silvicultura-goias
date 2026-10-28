@@ -58,6 +58,10 @@ th:first-child,td:first-child{text-align:left}
 .leaflet-popup-content table{min-width:190px}
 .pixelado{image-rendering:pixelated}
 .pix{margin-top:8px;padding-top:6px;border-top:1px solid var(--line);font-size:12.5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.coord{margin-top:8px;padding-top:6px;border-top:1px solid var(--line);display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;font-size:12px}
+.coord .ctxt{font-variant-numeric:tabular-nums;user-select:all}
+.coord .cp{font:inherit;font-size:11.5px;padding:2px 8px;border:1px solid var(--line);border-radius:5px;background:#fafaf7;cursor:pointer}
+.coord a{color:var(--accent)}
 .pix.sub{border-top:0;margin-top:2px;padding-top:0}
 .pix .obs{flex-basis:100%;color:var(--muted);font-size:11px;padding-left:18px}
 .pix i{width:12px;height:12px;border-radius:2px;border:1px solid rgba(0,0,0,.2);display:inline-block}
@@ -102,7 +106,7 @@ h2.hi{display:flex;align-items:center;justify-content:space-between;gap:8px}
 
     <section>
       <h2 class="hi">Mapas de pixel · estado inteiro<button class="ib" type="button" aria-label="Sobre esta seção" aria-expanded="false">i</button></h2>
-      <div class="info" hidden><b>Concordância MB × TC</b>: cada pixel de 30 m com silvicultura nos dois mapas (verde), só no MapBiomas (laranja) ou só no TerraClass (azul), na porção de Goiás no Cerrado. <b>TerraClass</b>: uso e cobertura do TerraClass Cerrado (INPE/Embrapa), legenda oficial do produto. <b>MapBiomas</b>: uso e cobertura da Coleção 11, legenda oficial. Ao afastar o zoom aparece uma visão geral simplificada (pixels de cerca de 200 m, pela classe mais frequente; na concordância, a silvicultura é mantida mesmo quando ocupa só parte do pixel). A partir do zoom 9 a página carrega o detalhe da área visível (concordância a 30 m; TerraClass e MapBiomas a 60 m, pela classe mais frequente). Clique no mapa para ver a classe do pixel. Na concordância, quando a silvicultura aparece só em um dos mapas, o popup mostra também a classe que o outro mapa deu àquele ponto (lida no mapa de 60 m, ou seja, a classe predominante no entorno).</div>
+      <div class="info" hidden><b>Concordância MB × TC</b>: cada pixel de 30 m com silvicultura nos dois mapas (verde), só no MapBiomas (laranja) ou só no TerraClass (azul), na porção de Goiás no Cerrado. <b>TerraClass</b>: uso e cobertura do TerraClass Cerrado (INPE/Embrapa), legenda oficial do produto. <b>MapBiomas</b>: uso e cobertura da Coleção 11, legenda oficial. Ao afastar o zoom aparece uma visão geral simplificada (pixels de cerca de 200 m, pela classe mais frequente; na concordância, a silvicultura é mantida mesmo quando ocupa só parte do pixel). A partir do zoom 9 a página carrega o detalhe da área visível: concordância a 30 m; TerraClass e MapBiomas a 60 m (classe mais frequente) nos zooms 9 e 10 e a 30 m a partir do zoom 11. Clique no mapa para ver a classe do pixel e as coordenadas do ponto, com botão para copiar e links para abrir o local no Google Earth e no Google Maps. Na concordância, quando a silvicultura aparece só em um dos mapas, o popup mostra também a classe que o outro mapa deu àquele ponto (lida no mapa de 60 m, ou seja, a classe predominante no entorno).</div>
       <div class="linha"><label><input type="checkbox" id="estOn" checked> Mostrar no mapa</label></div>
       <div class="seg" id="estProd" style="margin-top:8px">
         <button data-p="conc" class="on">Concordância</button>
@@ -293,7 +297,7 @@ const geo = L.geoJSON(MUNICIPIOS, {
     lyr.on('mouseout',  () => geo.resetStyle(lyr));
     lyr.on('click', e => {
       selecionado = f.properties.cd; geo.setStyle(estilo);
-      const pop = L.popup({autoPanPaddingTopLeft:[window.innerWidth>640?370:10,10], autoPanPaddingBottomRight:[70,10]}).setLatLng(e.latlng).setContent(popup(f.properties) + textoPixel(e.latlng)).openOn(map);
+      const pop = L.popup({autoPanPaddingTopLeft:[window.innerWidth>640?370:10,10], autoPanPaddingBottomRight:[70,10]}).setLatLng(e.latlng).setContent(popup(f.properties) + textoPixel(e.latlng) + coordHtml(e.latlng)).openOn(map);
       complementarPopup(pop, e.latlng);
       graficoMunicipio(f.properties);
     });
@@ -479,7 +483,7 @@ const EST = window.ESTADO || {};
 const gEst = L.layerGroup().addTo(map);
 let estOn = true, estProd = 'conc', estAno = 2024, estOp = 1;
 const ovCache = {};
-const ZOOM_DETALHE = 9;
+const ZOOM_DETALHE = 9, ZOOM_30M = 11;
 function overlay(arq, bounds){
   if (!ovCache[arq]) ovCache[arq] = L.imageOverlay('img/estado/'+arq, bounds, {pane:'estado', className:'pixelado', interactive:false});
   return ovCache[arq];
@@ -489,10 +493,12 @@ function atualizarEstado(){
   gEst.clearLayers();
   const d = dadosEst();
   if (estOn && d){
-    if (map.getZoom() < ZOOM_DETALHE || !d.partes.length) gEst.addLayer(overlay(d.geral.arq, d.geral.bounds));
+    const z = map.getZoom();
+    if (z < ZOOM_DETALHE || !d.partes.length) gEst.addLayer(overlay(d.geral.arq, d.geral.bounds));
     else {
+      const partes = (z >= ZOOM_30M && d.partes30) ? d.partes30 : d.partes;
       const vb = map.getBounds().pad(0.15);
-      d.partes.forEach(p=>{ if (vb.intersects(L.latLngBounds(p.bounds))) gEst.addLayer(overlay(p.arq, p.bounds)); });
+      partes.forEach(p=>{ if (vb.intersects(L.latLngBounds(p.bounds))) gEst.addLayer(overlay(p.arq, p.bounds)); });
     }
     gEst.eachLayer(l=>l.setOpacity(estOp));
   }
@@ -505,7 +511,11 @@ function legendaEst(){
   const cls = Object.keys(prod.classes).filter(k=>!d || !d.presentes || d.presentes.includes(+k));
   el.innerHTML = cls.map(k=>`<i style="background:${prod.classes[k].cor}"></i><span>${prod.classes[k].nome}</span>`).join('');
   const z = map.getZoom();
-  nota.textContent = !estOn ? '' : (z < ZOOM_DETALHE ? `Visão geral simplificada. Aproxime (zoom ${ZOOM_DETALHE}+) para o detalhe de ${prod.resDetalhe}.` : `Detalhe de ${prod.resDetalhe} na área visível.`);
+  const d30 = d && d.partes30;
+  nota.textContent = !estOn ? '' :
+    z < ZOOM_DETALHE ? `Visão geral simplificada. Aproxime (zoom ${ZOOM_DETALHE}+) para ver o detalhe.` :
+    (d30 && z < ZOOM_30M) ? `Detalhe de 60 m. Aproxime mais (zoom ${ZOOM_30M}+) para os pixels de 30 m.` :
+    `Pixels de ${d30 ? '30 m' : prod.resDetalhe} na área visível.`;
 }
 map.on('moveend', ()=>{ if (estOn) atualizarEstado(); });
 document.getElementById('estOn').onchange = e => { estOn = e.target.checked; atualizarEstado(); };
@@ -519,6 +529,25 @@ document.querySelectorAll('#estAno button').forEach(b=>b.onclick=()=>{
   if (!estOn){ estOn = true; document.getElementById('estOn').checked = true; } atualizarEstado();
 });
 document.getElementById('estOp').oninput = e => { estOp = e.target.value/100; gEst.eachLayer(l=>l.setOpacity(estOp)); };
+// coordenadas do ponto clicado, com cópia e links externos
+function coordHtml(ll){
+  const la = ll.lat.toFixed(6), lo = ll.lng.toFixed(6), txt = `${la}, ${lo}`;
+  const ge = `https://earth.google.com/web/@${la},${lo},700a,3000d,35y,0h,0t,0r`;
+  const gm = `https://www.google.com/maps/@${la},${lo},1500m/data=!3m1!1e3`;
+  return `<div class="coord"><span class="ctxt">${txt}</span>
+    <button type="button" class="cp" data-c="${txt}">Copiar</button>
+    <a href="${ge}" target="_blank" rel="noopener">Google Earth</a>
+    <a href="${gm}" target="_blank" rel="noopener">Google Maps</a></div>`;
+}
+document.addEventListener('click', e=>{
+  const b = e.target.closest('.cp'); if (!b) return;
+  const t = b.dataset.c;
+  const ok = ()=>{ b.textContent = 'Copiado'; setTimeout(()=>b.textContent='Copiar', 1500); };
+  const fallback = ()=>{ const s = b.parentElement.querySelector('.ctxt'); const r = document.createRange(); r.selectNodeContents(s);
+    const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r); b.textContent = 'Ctrl+C'; };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(ok, fallback); else fallback();
+});
+
 // classe do pixel clicado (lê a imagem já carregada)
 const canvasCache = {};
 function textoPixel(latlng){
@@ -557,7 +586,8 @@ function carregarParte(arq){
 }
 async function classeEm(prodId, ano, latlng){
   const prod = EST[prodId], d = prod && prod.anos[ano]; if (!d) return null;
-  const parte = d.partes.find(p=>L.latLngBounds(p.bounds).contains(latlng)); if (!parte) return null;
+  const lista = d.partes30 || d.partes;
+  const parte = lista.find(p=>L.latLngBounds(p.bounds).contains(latlng)); if (!parte) return null;
   const {cx, w, h} = await carregarParte(parte.arq);
   const crs = L.CRS.EPSG3857, b = L.latLngBounds(parte.bounds);
   const p = crs.project(latlng), sw = crs.project(b.getSouthWest()), ne = crs.project(b.getNorthEast());
@@ -575,15 +605,16 @@ async function complementarPopup(pop, latlng){
     const outro = c.codigo === 2 ? 'TC' : 'MB';
     const k = await classeEm(outro, estAno, latlng);
     const txt = k
-      ? `<div class="pix sub"><i style="background:${k.cor}"></i>↳ no ${EST[outro].titulo} ${estAno}: <b>${k.nome}</b><span class="obs">classe predominante em 60 m</span></div>`
+      ? `<div class="pix sub"><i style="background:${k.cor}"></i>↳ no ${EST[outro].titulo} ${estAno}: <b>${k.nome}</b><span class="obs">${EST[outro].anos[estAno].partes30 ? 'pixel de 30 m' : 'classe predominante em 60 m'}</span></div>`
       : `<div class="pix sub">↳ no ${EST[outro].titulo} ${estAno}: sem classe neste ponto</div>`;
-    if (map.hasLayer(pop)) pop.setContent(pop.getContent() + txt);
+    if (map.hasLayer(pop)){ const h = pop.getContent(), i = h.indexOf('<div class="coord">');
+      pop.setContent(i >= 0 ? h.slice(0,i) + txt + h.slice(i) : h + txt); }
   } catch(err){ /* arquivo local: o navegador bloqueia a leitura */ }
 }
 map.on('click', e=>{
   if (CAMADAS.mun.on) return;
   const t = textoPixel(e.latlng);
-  if (t){ const pop = L.popup().setLatLng(e.latlng).setContent(t).openOn(map); complementarPopup(pop, e.latlng); }
+  const pop = L.popup().setLatLng(e.latlng).setContent(t + coordHtml(e.latlng)).openOn(map); if (t) complementarPopup(pop, e.latlng);
 });
 atualizarEstado();
 
