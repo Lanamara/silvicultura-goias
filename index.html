@@ -211,7 +211,7 @@ const base = {
   'OpenStreetMap': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
     {attribution:'&copy; OpenStreetMap', maxZoom:19})
 };
-base['Claro (CARTO)'].addTo(map);
+base['Imagem (Esri)'].addTo(map);
 L.control.layers(base, null, {position:'topright'}).addTo(map);
 L.control.scale({imperial:false, position:'bottomright'}).addTo(map);
 
@@ -433,7 +433,7 @@ document.querySelectorAll('#recortes button').forEach(b=>b.onclick=()=>mostrarRe
 
 // ---------- painel de camadas ----------
 const limites = L.geoJSON(MUNICIPIOS, {interactive:false, style:{color:'#8a8f88', weight:0.6, fill:false}});
-let fundoAtual = base['Claro (CARTO)'];
+let fundoAtual = base['Imagem (Esri)'];
 map.on('baselayerchange', e => { fundoAtual = e.layer; fundoAtual.setOpacity(CAMADAS.fundo.op); if(!CAMADAS.fundo.on) map.removeLayer(fundoAtual); });
 const CAMADAS = {
   mun:     {nome:'Mapa municipal', on:false,  op:0.85, layer:()=>geo,
