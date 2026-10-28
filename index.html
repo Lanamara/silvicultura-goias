@@ -1,0 +1,597 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Silvicultura em Goiás</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="dados/municipios_mapa.js"></script>
+<script src="dados/serie_estadual.js"></script>
+<script src="dados/recortes.js"></script>
+<script src="dados/estado.js"></script>
+<style>
+:root{
+  --bg:#f6f5f1; --panel:#ffffff; --ink:#1f2a24; --muted:#5f6b64; --line:#e2e0d8;
+  --accent:#1a7f5a; --mb:#1a7f5a; --pevs:#c0562b; --tc:#2c6fd1;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);
+  font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+#map{position:absolute;inset:0}
+#painel{position:absolute;top:12px;left:12px;bottom:12px;width:340px;z-index:1000;
+  background:var(--panel);border:1px solid var(--line);border-radius:10px;
+  box-shadow:0 4px 18px rgba(0,0,0,.12);display:flex;flex-direction:column;overflow:hidden}
+#painel header{padding:14px 16px 10px;border-bottom:1px solid var(--line);position:relative}
+#painel h1{font-size:17px;margin:0 28px 4px 0;line-height:1.25}
+#painel header p{margin:0;color:var(--muted);font-size:12.5px}
+#toggle{position:absolute;top:10px;right:10px;width:26px;height:26px;border:1px solid var(--line);
+  background:#fff;border-radius:6px;cursor:pointer;font-size:16px;line-height:1}
+#corpo{overflow-y:auto;padding:4px 16px 16px}
+#painel.fechado{bottom:auto;width:auto}
+#painel.fechado #corpo,#painel.fechado header p{display:none}
+section{padding:12px 0;border-bottom:1px solid var(--line)}
+section:last-child{border-bottom:0}
+h2{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:0 0 8px}
+.seg{display:flex;flex-wrap:wrap;gap:4px}
+.seg button{flex:1 1 auto;border:1px solid var(--line);background:#fafaf7;padding:6px 8px;border-radius:6px;
+  cursor:pointer;font:inherit;font-size:12.5px;color:var(--ink)}
+.seg button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+.linha{display:flex;align-items:center;gap:8px;margin-top:8px;font-size:12.5px}
+.linha input[type=range]{flex:1}
+#anoLabel{font-weight:600;font-variant-numeric:tabular-nums;min-width:44px;text-align:right}
+.leg{display:grid;grid-template-columns:16px 1fr;gap:4px 8px;font-size:12.5px;align-items:center}
+.leg i{width:16px;height:12px;border-radius:2px;border:1px solid rgba(0,0,0,.15)}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.stat{background:#fafaf7;border:1px solid var(--line);border-radius:8px;padding:8px}
+.stat b{display:block;font-size:16px;font-variant-numeric:tabular-nums}
+.stat span{font-size:11.5px;color:var(--muted)}
+.nota{font-size:11.5px;color:var(--muted);margin-top:6px}
+#graf{height:170px}
+#grafMun{height:150px}
+#munNome{font-weight:600;margin-bottom:4px}
+table{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
+th,td{padding:3px 4px;text-align:right;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left}
+.leaflet-popup-content{font-size:13px;margin:10px 12px}
+.leaflet-popup-content table{min-width:190px}
+.pixelado{image-rendering:pixelated}
+.pix{margin-top:8px;padding-top:6px;border-top:1px solid var(--line);font-size:12.5px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.pix i{width:12px;height:12px;border-radius:2px;border:1px solid rgba(0,0,0,.2);display:inline-block}
+.seg button:disabled{cursor:not-allowed}
+h2.hi{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.ib{flex:none;width:18px;height:18px;border-radius:50%;border:1px solid var(--muted);background:transparent;color:var(--muted);
+  font:italic 600 11px/1 Georgia,serif;cursor:pointer;padding:0;text-transform:none;letter-spacing:0}
+.ib[aria-expanded=true]{background:var(--accent);border-color:var(--accent);color:#fff}
+.ib:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.info{font-size:12.5px;line-height:1.5;background:#f3f6f2;border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin:0 0 10px;color:var(--ink)}
+.serie{display:flex;align-items:center;gap:6px;font-size:12.5px;margin-bottom:6px}
+.serie select{font:inherit;padding:2px 4px;border:1px solid var(--line);border-radius:5px;background:#fff}
+.busca input{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:6px;font:inherit}
+.camadas .cam{display:grid;grid-template-columns:1fr 90px;align-items:center;gap:4px 8px;padding:3px 0;font-size:12.5px}
+.camadas .cam label{display:flex;align-items:center;gap:6px;cursor:pointer}
+.camadas .cam input[type=range]{width:90px}
+.camadas .cam.off input[type=range]{opacity:.35}
+.hatch{background:repeating-linear-gradient(45deg,#ddd 0 3px,#fff 3px 6px)!important}
+@media (max-width:640px){
+  #painel{left:8px;right:8px;width:auto;top:auto;bottom:8px;max-height:55%}
+}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<aside id="painel">
+  <header>
+    <h1>Silvicultura em Goiás</h1>
+    <p>MapBiomas Col. 11, PEVS/IBGE (Tab. 5930) e TerraClass Cerrado. Teixeira &amp; Ferreira, XXII SBSR (versão de teste).</p>
+    <button id="toggle" title="Recolher painel">−</button>
+  </header>
+  <div id="corpo">
+    <section>
+      <h2 class="hi">Buscar município<button class="ib" type="button" aria-label="Sobre esta seção" aria-expanded="false">i</button></h2>
+      <div class="info" hidden>Digite o nome de um município de Goiás e escolha na lista. O mapa aproxima, abre o resumo do município e mostra a série dele mais abaixo, em "Município selecionado".</div>
+      <div class="busca">
+        <input id="busca" list="listaMun" placeholder="Digite o nome…" autocomplete="off">
+        <datalist id="listaMun"></datalist>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="hi">Mapas de pixel · estado inteiro<button class="ib" type="button" aria-label="Sobre esta seção" aria-expanded="false">i</button></h2>
+      <div class="info" hidden><b>Concordância MB × TC</b>: cada pixel de 30 m com silvicultura nos dois mapas (verde), só no MapBiomas (laranja) ou só no TerraClass (azul), na porção de Goiás no Cerrado. <b>TerraClass</b>: uso e cobertura do TerraClass Cerrado (INPE/Embrapa), legenda oficial do produto. <b>MapBiomas</b>: uso e cobertura da Coleção 11, legenda oficial. Ao afastar o zoom aparece uma visão geral simplificada (pixels de cerca de 200 m, pela classe mais frequente; na concordância, a silvicultura é mantida mesmo quando ocupa só parte do pixel). A partir do zoom 9 a página carrega o detalhe da área visível (concordância a 30 m; TerraClass e MapBiomas a 60 m, pela classe mais frequente). Clique no mapa para ver a classe do pixel.</div>
+      <div class="linha"><label><input type="checkbox" id="estOn" checked> Mostrar no mapa</label></div>
+      <div class="seg" id="estProd" style="margin-top:8px">
+        <button data-p="conc" class="on">Concordância</button>
+        <button data-p="TC">TerraClass</button>
+        <button data-p="MB">MapBiomas</button>
+      </div>
+      <div class="seg" id="estAno" style="margin-top:6px">
+        <button data-a="2018">2018</button><button data-a="2020">2020</button><button data-a="2022">2022</button><button data-a="2024" class="on">2024</button>
+      </div>
+      <div class="linha"><span>Opacidade</span><input type="range" id="estOp" min="0" max="100" value="100"></div>
+      <div class="leg" id="estLeg" style="margin-top:8px"></div>
+      <div class="nota" id="estNota"></div>
+    </section>
+
+    <section>
+      <h2 class="hi">O que o mapa municipal mostra<button class="ib" type="button" aria-label="Sobre esta seção" aria-expanded="false">i</button></h2>
+      <div class="info" hidden>Escolhe a variável que colore os 246 municípios. <b>MapBiomas</b>: área de silvicultura (classe 9 da Coleção 11, pixels de 30 m), somada pela área real dos pixels. <b>PEVS</b>: área total de florestas plantadas em 31/12 declarada por município ao IBGE (Tabela 5930); 2025 é preliminar. <b>MapBiomas − PEVS</b>: diferença em ha; positivo quando o MapBiomas mapeia mais área que a PEVS registra. <b>Dice MB × TC</b>: sobreposição espacial entre a silvicultura do MapBiomas e a do TerraClass Cerrado (2018, 2020, 2022, 2024), D = 2A/(2A+B+C), de 0 (nenhuma sobreposição) a 1 (sobreposição total). O controle <b>Ano</b> se ajusta ao período de cada variável.</div>
+      <div class="seg" id="camadas">
+        <button data-c="mb" class="on">MapBiomas</button>
+        <button data-c="pevs">PEVS</button>
+        <button data-c="dif">MapBiomas − PEVS</button>
+        <button data-c="dice">Dice MB × TC</button>
+      </div>
+      <div class="linha">
+        <span>Ano</span>
+        <input type="range" id="ano" min="1985" max="2025" value="2024" step="1">
+        <span id="anoLabel">2024</span>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="hi">Camadas visíveis<button class="ib" type="button" aria-label="Sobre esta seção" aria-expanded="false">i</button></h2>
+      <div class="info" hidden>Liga ou desliga cada camada e ajusta a transparência com a barra ao lado. <b>Limites dos municípios</b> mostra só os contornos, útil quando o mapa municipal está desligado.</div>
+      <div id="listaCamadas" class="camadas"></div>
+    </section>
+
+
+    <section>
+      <h2 class="hi"><span id="legTitulo">Classes (ha)</span><button class="ib" type="button" aria-label="Sobre esta seção" aria-expanded="false">i</button></h2>
+      <div class="info" hidden>Classes de cor da variável escolhida acima. Municípios em cinza tracejado não têm dado na PEVS naquele ano. No Dice, cinza indica menos de 50 ha de silvicultura nos dois mapas, área pequena demais para o índice ser estável. Clique num município para ver os valores.</div>
+      <div class="leg" id="legenda"></div>
+    </section>
+
+    <section>
+      <h2 class="hi">Goiás no ano selecionado<button class="ib" type="button" aria-label="Sobre esta seção" aria-expanded="false">i</button></h2>
+      <div class="info" hidden>Totais estaduais do ano escolhido. <b>R²</b> e <b>RMSE</b> comparam MapBiomas e PEVS município a município, apenas onde a PEVS tem dado (n). R² perto de 1 indica que as duas fontes crescem e diminuem juntas entre municípios; o RMSE é a diferença típica, em ha, por município. Na variável Dice, os cartões mostram o índice estadual e a área de cada situação.</div>
+      <div class="stats" id="stats"></div>
+      <div class="nota" id="statsNota"></div>
+    </section>
+
+    <section>
+      <h2 class="hi">Série estadual (mil ha)<button class="ib" type="button" aria-label="Sobre esta seção" aria-expanded="false">i</button></h2>
+      <div class="info" hidden>Área de silvicultura em Goiás por fonte, em mil hectares. O TerraClass cobre só a porção de Goiás no Cerrado. Cabral et al. (2019) são estimativas Landsat para 2002 e 2015. Use <b>De</b> e <b>Até</b> para escolher o período; clique no nome de uma fonte na legenda do gráfico para escondê-la ou mostrá-la. A linha tracejada marca o ano selecionado no mapa.</div>
+      <div class="serie"><label for="serDe">De</label><select id="serDe"></select><label for="serAte">até</label><select id="serAte"></select></div>
+      <div id="graf"><canvas id="cGraf"></canvas></div>
+      <div class="nota">TerraClass: porção de Goiás no Cerrado (Tabela 1 do artigo). Cabral et al. (2019): 2002 e 2015. PEVS 2025 preliminar.</div>
+    </section>
+
+    <section id="secMun" hidden>
+      <h2 class="hi">Município selecionado<button class="ib" type="button" aria-label="Sobre esta seção" aria-expanded="false">i</button></h2>
+      <div class="info" hidden>Série do município clicado ou buscado: MapBiomas em todos os anos e PEVS de 2013 a 2025. Lacunas na PEVS indicam anos em que o município não teve área registrada. O período segue o De/Até da série estadual.</div>
+      <div id="munNome"></div>
+      <div id="grafMun"><canvas id="cMun"></canvas></div>
+    </section>
+
+    <section>
+      <h2 class="hi">Concordância MapBiomas × TerraClass<button class="ib" type="button" aria-label="Sobre esta seção" aria-expanded="false">i</button></h2>
+      <div class="info" hidden>Soma estadual das três situações de pixel (30 m): silvicultura nos dois mapas (Ambos, A), só no MapBiomas (B) e só no TerraClass (C), com o Dice correspondente. O TerraClass (10 m) foi agregado à grade do MapBiomas pela classe majoritária, excluindo a classe "não observado". Um Dice em queda indica que os dois mapeamentos concordam cada vez menos sobre onde há plantio.</div>
+      <table>
+        <thead><tr><th>Ano</th><th>Ambos</th><th>Só MB</th><th>Só TC</th><th>Dice</th></tr></thead>
+        <tbody id="tabDice"></tbody>
+      </table>
+      <div class="nota">Áreas em ha, somadas dos CSVs <code>MB11_TC_*_GO_nativo_moda</code> (iguais à Tabela 1 do artigo).</div>
+    </section>
+
+    <section>
+      <h2 class="hi">Recortes 2024 (Figura 4)<button class="ib" type="button" aria-label="Sobre esta seção" aria-expanded="false">i</button></h2>
+      <div class="info" hidden>Os três municípios da Figura 4: <b>Catalão</b> (alta concordância), <b>Jussara</b> (silvicultura só no MapBiomas, onde o TerraClass vê vegetação nativa) e <b>Serranópolis</b> (silvicultura só no TerraClass, onde o MapBiomas vê mosaico de usos ou pastagem). Pixels de 30 m de 2024 sobre composição Sentinel-2 em cor verdadeira (mediana de maio a setembro de 2024). Clique num município para aproximar.</div>
+      <div class="seg" id="recortes">
+        <button data-r="Catalao">Catalão</button>
+        <button data-r="Jussara">Jussara</button>
+        <button data-r="Serranopolis">Serranópolis</button>
+      </div>
+      <div class="leg" style="margin-top:10px">
+        <i style="background:#1a9e77"></i><span>Silvicultura em ambos</span>
+        <i style="background:#f07d1a"></i><span>Apenas no MapBiomas</span>
+        <i style="background:#2c6fd1"></i><span>Apenas no TerraClass</span>
+      </div>
+      <div id="camadasRec" class="camadas" style="margin-top:10px"></div>
+      <div class="nota" id="recNota">Clique num recorte para aproximar (liga o Sentinel-2). Extensão do raster exportado do GEE.</div>
+    </section>
+  </div>
+</aside>
+
+<script>
+const fmt = (v, d=0) => v==null || isNaN(v) ? '—' : v.toLocaleString('pt-BR',{maximumFractionDigits:d, minimumFractionDigits:d});
+
+// ---------- mapa base ----------
+const map = L.map('map', {zoomControl:false, preferCanvas:true}).setView([-16, -49.6], 7);
+L.control.zoom({position:'topright'}).addTo(map);
+const base = {
+  'Claro (CARTO)': L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+    {attribution:'&copy; OpenStreetMap &copy; CARTO', maxZoom:19}),
+  'Imagem (Esri)': L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    {attribution:'Esri, Maxar, Earthstar Geographics', maxZoom:19}),
+  'OpenStreetMap': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+    {attribution:'&copy; OpenStreetMap', maxZoom:19})
+};
+base['Claro (CARTO)'].addTo(map);
+L.control.layers(base, null, {position:'topright'}).addTo(map);
+L.control.scale({imperial:false, position:'bottomright'}).addTo(map);
+
+// ---------- classes ----------
+const CLS = {
+  area: {breaks:[1,100,500,1000,2000,5000],
+         cores:['#f3f1ea','#d9eed3','#a8d8a0','#6dbd72','#3a9a55','#1c7340','#0b4a28'],
+         rot:['0 ou < 1','1 – 100','100 – 500','500 – 1.000','1.000 – 2.000','2.000 – 5.000','> 5.000']},
+  dif:  {breaks:[-2000,-500,-100,100,500,2000],
+         cores:['#2166ac','#67a9cf','#d1e5f0','#f7f7f7','#fddbc7','#ef8a62','#b2182b'],
+         rot:['< −2.000','−2.000 a −500','−500 a −100','−100 a 100','100 a 500','500 a 2.000','> 2.000']},
+  dice: {breaks:[0.2,0.4,0.6,0.8],
+         cores:['#d7191c','#fdae61','#ffffbf','#a6d96a','#1a9641'],
+         rot:['0,0 – 0,2','0,2 – 0,4','0,4 – 0,6','0,6 – 0,8','0,8 – 1,0']}
+};
+const ANOS_TC = [2018,2020,2022,2024];
+function dice(p){
+  const c = p.conc && p.conc[ano]; if(!c) return null;
+  if ((c.a+c.b) < 50 && (c.a+c.c) < 50) return 'pouco';
+  return 2*c.a/(2*c.a+c.b+c.c);
+}
+function classe(v, c){ let i=0; while(i<c.breaks.length && v>=c.breaks[i]) i++; return i; }
+
+let camada = 'mb', ano = 2024, opac = 0.85, selecionado = null;
+
+function valor(p){
+  const mb = p.mb[ano], pv = p.pevs[ano];
+  if (camada==='mb') return mb ?? null;
+  if (camada==='pevs') return pv ?? null;
+  if (camada==='dice') return dice(p);
+  return (pv==null || mb==null) ? null : mb - pv;
+}
+function estilo(f){
+  const v = valor(f.properties);
+  const c = camada==='dif' ? CLS.dif : camada==='dice' ? CLS.dice : CLS.area;
+  if (v==='pouco') return {fillColor:'#bdbdbd', fillOpacity: opac*0.7,
+    color: f.properties.cd===selecionado?'#111':'#7a7a72', weight: f.properties.cd===selecionado?2.2:0.5};
+  const semDado = v==null;
+  return {
+    fillColor: semDado ? '#cfcfcf' : c.cores[classe(v,c)],
+    fillOpacity: semDado ? opac*0.5 : opac,
+    color: f.properties.cd===selecionado ? '#111' : '#7a7a72',
+    weight: f.properties.cd===selecionado ? 2.2 : 0.5,
+    dashArray: semDado ? '2 3' : null
+  };
+}
+
+function popup(p){
+  const mb=p.mb[ano], pv=p.pevs[ano];
+  const dif = (mb!=null && pv!=null) ? mb-pv : null;
+  return `<b>${p.nm}</b><br><span style="color:#5f6b64">${p.rgi}</span>
+  <table><tr><td>Ano</td><td>${ano}</td></tr>
+  <tr><td>MapBiomas</td><td>${fmt(mb)} ha</td></tr>
+  <tr><td>PEVS</td><td>${ano<2013 ? 'fora da série' : (pv==null?'sem dado':fmt(pv)+' ha')}</td></tr>
+  <tr><td>MB − PEVS</td><td>${dif==null?'—':(dif>0?'+':'')+fmt(dif)+' ha'}</td></tr></table>${popupConc(p)}`;
+}
+const NOMES = {pas:'Pastagem', agr:'Agricultura', veg:'Vegetação nativa', mos:'Mosaico de usos', out:'Outros'};
+function popupConc(p){
+  const c = p.conc && p.conc[ano];
+  if (!c) return `<div class="nota">TerraClass disponível para ${ANOS_TC.join(', ')}.</div>`;
+  const d = dice(p);
+  const lista = (o, tot) => Object.entries(o).filter(([k,v])=>v>=1).sort((x,y)=>y[1]-x[1])
+     .map(([k,v])=>`<tr><td style="padding-left:12px">${NOMES[k]}</td><td>${fmt(v)} ha (${fmt(100*v/tot)}%)</td></tr>`).join('');
+  return `<table style="margin-top:6px">
+  <tr><th colspan="2" style="text-align:left">MapBiomas × TerraClass ${ano}</th></tr>
+  <tr><td>Dice</td><td>${d==='pouco'?'< 50 ha nos dois':fmt(d,2)}</td></tr>
+  <tr><td>Silvicultura nos dois mapas</td><td>${fmt(c.a)} ha</td></tr>
+  <tr><td>Silvicultura só no MapBiomas</td><td>${fmt(c.b)} ha</td></tr>
+  ${c.b>=1 ? '<tr><td colspan="2" style="color:#5f6b64">↳ o TerraClass classifica essa área como:</td></tr>'+lista(c.dmb,c.b) : ''}
+  <tr><td>Silvicultura só no TerraClass</td><td>${fmt(c.c)} ha</td></tr>
+  ${c.c>=1 ? '<tr><td colspan="2" style="color:#5f6b64">↳ o MapBiomas classifica essa área como:</td></tr>'+lista(c.dtc,c.c) : ''}
+  </table>`;
+}
+
+const geo = L.geoJSON(MUNICIPIOS, {
+  style: estilo,
+  onEachFeature: (f, lyr) => {
+    lyr.on('mouseover', () => lyr.setStyle({weight:2, color:'#111'}));
+    lyr.on('mouseout',  () => geo.resetStyle(lyr));
+    lyr.on('click', e => {
+      selecionado = f.properties.cd; geo.setStyle(estilo);
+      L.popup({autoPanPaddingTopLeft:[window.innerWidth>640?370:10,10], autoPanPaddingBottomRight:[70,10]}).setLatLng(e.latlng).setContent(popup(f.properties) + textoPixel(e.latlng)).openOn(map);
+      graficoMunicipio(f.properties);
+    });
+  }
+}).addTo(map);
+map.fitBounds(geo.getBounds(), {paddingTopLeft:[window.innerWidth>640?360:0,0]});
+
+// ---------- legenda e estatísticas ----------
+function legenda(){
+  const c = camada==='dif' ? CLS.dif : camada==='dice' ? CLS.dice : CLS.area;
+  document.getElementById('legTitulo').textContent =
+    camada==='dif' ? 'MapBiomas − PEVS (ha) · positivo: MB maior' :
+    camada==='dice' ? 'Dice MB × TC · 0 = nenhuma sobreposição, 1 = total' :
+    (camada==='mb'?'Área MapBiomas (ha)':'Área PEVS (ha)');
+  let h = c.cores.map((cor,i)=>`<i style="background:${cor}"></i><span>${c.rot[i]}</span>`).join('');
+  if (camada==='dice') h += `<i style="background:#bdbdbd"></i><span>&lt; 50 ha nos dois mapeamentos</span>`;
+  else if (camada!=='mb') h += `<i class="hatch"></i><span>Sem dado na PEVS</span>`;
+  document.getElementById('legenda').innerHTML = h;
+}
+
+function stats(){
+  const F = MUNICIPIOS.features.map(f=>f.properties);
+  const mbT = SERIE_UF.mb[ano], pvT = SERIE_UF.pevs[ano];
+  let html = `<div class="stat"><b>${fmt(mbT)}</b><span>ha MapBiomas</span></div>
+              <div class="stat"><b>${pvT==null?'—':fmt(pvT)}</b><span>ha PEVS${ano===2025?' (preliminar)':''}</span></div>`;
+  let nota = '';
+  if (camada==='dice'){
+    let A=0,B=0,C=0; F.forEach(p=>{const c=p.conc&&p.conc[ano]; if(c){A+=c.a;B+=c.b;C+=c.c;}});
+    html = `<div class="stat"><b>${fmt(2*A/(2*A+B+C),2)}</b><span>Dice estadual</span></div>
+            <div class="stat"><b>${fmt(A)}</b><span>ha em ambos</span></div>
+            <div class="stat"><b>${fmt(B)}</b><span>ha só no MapBiomas</span></div>
+            <div class="stat"><b>${fmt(C)}</b><span>ha só no TerraClass</span></div>`;
+    nota = 'Porção de Goiás no Cerrado; TerraClass agregado a 30 m pela classe majoritária, sem "não observado".';
+  } else if (ano>=2013 && ano<=2024){
+    const par = F.filter(p=>p.pevs[ano]!=null && p.mb[ano]!=null).map(p=>[p.mb[ano], p.pevs[ano]]);
+    const n = par.length, mx = par.reduce((s,a)=>s+a[0],0)/n, my = par.reduce((s,a)=>s+a[1],0)/n;
+    let sxy=0,sxx=0,syy=0,se=0;
+    par.forEach(([x,y])=>{sxy+=(x-mx)*(y-my);sxx+=(x-mx)**2;syy+=(y-my)**2;se+=(x-y)**2});
+    const r2 = (sxy*sxy)/(sxx*syy), rmse = Math.sqrt(se/n);
+    const semP = F.filter(p=>p.pevs[ano]==null);
+    const haSem = semP.reduce((s,p)=>s+(p.mb[ano]||0),0);
+    html += `<div class="stat"><b>${fmt(r2,2)}</b><span>R² municipal (n = ${n})</span></div>
+             <div class="stat"><b>${fmt(rmse)}</b><span>RMSE (ha)</span></div>`;
+    nota = `${semP.length} municípios sem dado na PEVS, com ${fmt(haSem)} ha no MapBiomas (${fmt(100*haSem/mbT,1)}% do total).`;
+  } else if (ano<2013) nota = 'A PEVS (Tabela 5930) começa em 2013.';
+  else nota = 'PEVS 2025 preliminar: o artigo a usa só na série temporal.';
+  document.getElementById('stats').innerHTML = html;
+  document.getElementById('statsNota').textContent = nota;
+}
+
+// ---------- gráficos ----------
+const anos = Object.keys(SERIE_UF.mb).map(Number);
+const TC = {2018:181555, 2020:164280, 2022:115162, 2024:109743};
+const CABRAL = {2002:50425, 2015:162516};
+const k = v => v==null ? null : v/1000;
+const linhaAno = {
+  id:'linhaAno',
+  afterDraw(ch){ const x=ch.scales.x, y=ch.scales.y, xp=x.getPixelForValue(String(ano));
+    if(xp==null) return; const c=ch.ctx; c.save(); c.strokeStyle='rgba(0,0,0,.35)'; c.setLineDash([3,3]);
+    c.beginPath(); c.moveTo(xp,y.top); c.lineTo(xp,y.bottom); c.stroke(); c.restore(); }
+};
+const optsBase = {
+  responsive:true, maintainAspectRatio:false, animation:false, spanGaps:true,
+  interaction:{mode:'index', intersect:false},
+  plugins:{legend:{labels:{boxWidth:10, font:{size:10.5}}},
+           tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${fmt(c.parsed.y,1)}`}}},
+  scales:{x:{ticks:{maxTicksLimit:6, font:{size:10}}}, y:{beginAtZero:true, ticks:{font:{size:10}}}}
+};
+const chUF = new Chart(document.getElementById('cGraf'), {
+  type:'line', plugins:[linhaAno],
+  data:{labels:anos.map(String), datasets:[
+    {label:'MapBiomas', data:anos.map(a=>k(SERIE_UF.mb[a])), borderColor:'#1a7f5a', pointRadius:0, borderWidth:2},
+    {label:'PEVS', data:anos.map(a=>k(SERIE_UF.pevs[a])), borderColor:'#c0562b', pointRadius:1.5, borderWidth:2},
+    {label:'TerraClass', data:anos.map(a=>k(TC[a])), borderColor:'#2c6fd1', backgroundColor:'#2c6fd1', pointRadius:3.5, showLine:true, borderWidth:1.5},
+    {label:'Cabral et al.', data:anos.map(a=>k(CABRAL[a])), borderColor:'#333', backgroundColor:'#fff', pointRadius:4, pointStyle:'rectRot', showLine:false}
+  ]},
+  options:optsBase
+});
+let chMun = null;
+function graficoMunicipio(p){
+  document.getElementById('secMun').hidden = false;
+  document.getElementById('munNome').textContent = p.nm;
+  const ds = [
+    {label:'MapBiomas (ha)', data:anos.map(a=>p.mb[a]??null), borderColor:'#1a7f5a', pointRadius:0, borderWidth:2},
+    {label:'PEVS (ha)', data:anos.map(a=>p.pevs[a]??null), borderColor:'#c0562b', pointRadius:1.5, borderWidth:2, spanGaps:false}
+  ];
+  if (chMun){ chMun.data.datasets = ds; aplicarPeriodo(); return; }
+  chMun = new Chart(document.getElementById('cMun'), {type:'line', plugins:[linhaAno],
+    data:{labels:anos.map(String), datasets:ds}, options:optsBase});
+  aplicarPeriodo();
+}
+// período da série
+let serDe = 1985, serAte = 2025;
+['serDe','serAte'].forEach(id=>{
+  document.getElementById(id).innerHTML = anos.map(a=>`<option value="${a}">${a}</option>`).join('');
+});
+document.getElementById('serDe').value = serDe; document.getElementById('serAte').value = serAte;
+function aplicarPeriodo(){
+  const idx = anos.map((a,i)=>[a,i]).filter(([a])=>a>=serDe && a<=serAte).map(([,i])=>i);
+  [chUF, chMun].forEach(ch=>{ if(!ch) return;
+    ch.data.labels = idx.map(i=>String(anos[i]));
+    ch.data.datasets.forEach(d=>{ if(!d._full) d._full = d.data.slice(); d.data = idx.map(i=>d._full[i]); });
+    ch.update(); });
+}
+['serDe','serAte'].forEach(id=>document.getElementById(id).onchange = ()=>{
+  let a=+document.getElementById('serDe').value, b=+document.getElementById('serAte').value;
+  if (a>b){ [a,b]=[b,a]; document.getElementById('serDe').value=a; document.getElementById('serAte').value=b; }
+  serDe=a; serAte=b; aplicarPeriodo();
+});
+// botões de informação
+document.querySelectorAll('.ib').forEach(b=>b.onclick=()=>{
+  const box = b.closest('h2').nextElementSibling; const abrir = box.hidden;
+  box.hidden = !abrir; b.setAttribute('aria-expanded', String(abrir));
+});
+
+// ---------- tabela Dice ----------
+document.getElementById('tabDice').innerHTML = ANOS_TC.map(y=>{
+  let A=0,B=0,C=0; MUNICIPIOS.features.forEach(f=>{const c=f.properties.conc&&f.properties.conc[y]; if(c){A+=c.a;B+=c.b;C+=c.c;}});
+  return [y,A,B,C,2*A/(2*A+B+C)];
+}).map(r=>`<tr><td>${r[0]}</td><td>${fmt(r[1])}</td><td>${fmt(r[2])}</td><td>${fmt(r[3])}</td><td>${fmt(r[4],2)}</td></tr>`).join('');
+
+// ---------- recortes ----------
+map.createPane('recortes'); map.getPane('recortes').style.zIndex = 450;
+const gS2 = L.layerGroup(), gConc = L.layerGroup(), gMoldura = L.layerGroup();
+Object.entries(RECORTES).forEach(([nome, r]) => {
+  gS2.addLayer(L.imageOverlay(`img/S2_${nome}_2024.jpg`, r.bounds, {pane:'recortes'}));
+  gConc.addLayer(L.imageOverlay(`img/concordancia_${nome}_2024.png`, r.bounds, {interactive:false, pane:'recortes', className:'pixelado'}));
+  gMoldura.addLayer(L.rectangle(r.bounds, {color:'#111', weight:1, fill:false, dashArray:'4 4', interactive:false}));
+});
+function mostrarRecorte(nome){
+  document.querySelectorAll('#recortes button').forEach(b=>b.classList.toggle('on', b.dataset.r===nome));
+  map.closePopup();
+  ligar('s2', true); ligar('conc', true); ligar('moldura', true);
+  map.flyToBounds(RECORTES[nome].bounds, {duration:0.8, paddingTopLeft:[window.innerWidth>640?360:0,0]});
+}
+document.querySelectorAll('#recortes button').forEach(b=>b.onclick=()=>mostrarRecorte(b.dataset.r));
+
+// ---------- painel de camadas ----------
+const limites = L.geoJSON(MUNICIPIOS, {interactive:false, style:{color:'#8a8f88', weight:0.6, fill:false}});
+let fundoAtual = base['Claro (CARTO)'];
+map.on('baselayerchange', e => { fundoAtual = e.layer; fundoAtual.setOpacity(CAMADAS.fundo.op); if(!CAMADAS.fundo.on) map.removeLayer(fundoAtual); });
+const CAMADAS = {
+  mun:     {nome:'Mapa municipal', on:false,  op:0.85, layer:()=>geo,
+            opac:v=>{ opac=v; geo.setStyle(estilo); }},
+  limites: {nome:'Limites dos municípios',        on:true, op:1,    layer:()=>limites,
+            opac:v=>limites.setStyle({opacity:v})},
+  conc:    {grp:'rec', nome:'Concordância MB × TC',  on:false,  op:1,    layer:()=>gConc,
+            opac:v=>gConc.eachLayer(l=>l.setOpacity(v))},
+  s2:      {grp:'rec', nome:'Sentinel-2 cor verdadeira',    on:false, op:1,    layer:()=>gS2,
+            opac:v=>gS2.eachLayer(l=>l.setOpacity(v))},
+  moldura: {grp:'rec', nome:'Contorno dos recortes',         on:false,  op:1,    layer:()=>gMoldura,
+            opac:v=>gMoldura.eachLayer(l=>l.setStyle({opacity:v}))},
+  fundo:   {nome:'Mapa de fundo',                 on:true,  op:1,    layer:()=>fundoAtual,
+            opac:v=>fundoAtual.setOpacity(v)}
+};
+function ligar(id, on){
+  const c = CAMADAS[id]; c.on = on;
+  const lyr = c.layer();
+  if (on){ lyr.addTo(map); c.opac(c.op); } else map.removeLayer(lyr);
+  if (CAMADAS.conc.on) gConc.eachLayer(l=>l.bringToFront());   // concordância sempre por cima do Sentinel-2
+  if (id==='mun' && !on) map.closePopup();
+  const el = document.querySelector(`.cam[data-id=${id}]`);
+  if (el){ el.classList.toggle('off', !on); el.querySelector('input[type=checkbox]').checked = on; }
+}
+const linhaCam = ([id,c])=>`
+  <div class="cam" data-id="${id}">
+    <label><input type="checkbox" ${c.on?'checked':''}> ${c.nome}</label>
+    <input type="range" min="0" max="100" value="${Math.round(c.op*100)}" title="Opacidade">
+  </div>`;
+const ents = Object.entries(CAMADAS);
+document.getElementById('listaCamadas').innerHTML = ents.filter(([,c])=>c.grp!=='rec').map(linhaCam).join('');
+document.getElementById('camadasRec').innerHTML   = ents.filter(([,c])=>c.grp==='rec').map(linhaCam).join('');
+document.querySelectorAll('.cam').forEach(el=>{
+  const id = el.dataset.id;
+  el.querySelector('input[type=checkbox]').onchange = e => ligar(id, e.target.checked);
+  el.querySelector('input[type=range]').oninput = e => { CAMADAS[id].op = e.target.value/100; if(CAMADAS[id].on) CAMADAS[id].opac(CAMADAS[id].op); };
+});
+Object.keys(CAMADAS).forEach(id=>ligar(id, CAMADAS[id].on));
+
+// ---------- mapas de pixel do estado ----------
+map.createPane('estado'); map.getPane('estado').style.zIndex = 440;
+const EST = window.ESTADO || {};
+const gEst = L.layerGroup().addTo(map);
+let estOn = true, estProd = 'conc', estAno = 2024, estOp = 1;
+const ovCache = {};
+const ZOOM_DETALHE = 9;
+function overlay(arq, bounds){
+  if (!ovCache[arq]) ovCache[arq] = L.imageOverlay('img/estado/'+arq, bounds, {pane:'estado', className:'pixelado', interactive:false});
+  return ovCache[arq];
+}
+function dadosEst(){ return EST[estProd] && EST[estProd].anos[estAno]; }
+function atualizarEstado(){
+  gEst.clearLayers();
+  const d = dadosEst();
+  if (estOn && d){
+    if (map.getZoom() < ZOOM_DETALHE || !d.partes.length) gEst.addLayer(overlay(d.geral.arq, d.geral.bounds));
+    else {
+      const vb = map.getBounds().pad(0.15);
+      d.partes.forEach(p=>{ if (vb.intersects(L.latLngBounds(p.bounds))) gEst.addLayer(overlay(p.arq, p.bounds)); });
+    }
+    gEst.eachLayer(l=>l.setOpacity(estOp));
+  }
+  legendaEst();
+}
+function legendaEst(){
+  const prod = EST[estProd], el = document.getElementById('estLeg'), nota = document.getElementById('estNota');
+  if (!prod){ el.innerHTML=''; nota.textContent = 'MapBiomas: aguardando a exportação de Goiás do GEE.'; return; }
+  const d = prod.anos[estAno];
+  const cls = Object.keys(prod.classes).filter(k=>!d || !d.presentes || d.presentes.includes(+k));
+  el.innerHTML = cls.map(k=>`<i style="background:${prod.classes[k].cor}"></i><span>${prod.classes[k].nome}</span>`).join('');
+  const z = map.getZoom();
+  nota.textContent = !estOn ? '' : (z < ZOOM_DETALHE ? `Visão geral simplificada. Aproxime (zoom ${ZOOM_DETALHE}+) para o detalhe de ${prod.resDetalhe}.` : `Detalhe de ${prod.resDetalhe} na área visível.`);
+}
+map.on('moveend', ()=>{ if (estOn) atualizarEstado(); });
+document.getElementById('estOn').onchange = e => { estOn = e.target.checked; atualizarEstado(); };
+document.querySelectorAll('#estProd button').forEach(b=>{
+  if (!EST[b.dataset.p]) { b.disabled = true; b.title = 'Aguardando os dados'; b.style.opacity = .45; }
+  b.onclick = ()=>{ document.querySelectorAll('#estProd button').forEach(x=>x.classList.toggle('on', x===b)); estProd = b.dataset.p;
+    if (!estOn){ estOn = true; document.getElementById('estOn').checked = true; } atualizarEstado(); };
+});
+document.querySelectorAll('#estAno button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#estAno button').forEach(x=>x.classList.toggle('on', x===b)); estAno = +b.dataset.a;
+  if (!estOn){ estOn = true; document.getElementById('estOn').checked = true; } atualizarEstado();
+});
+document.getElementById('estOp').oninput = e => { estOp = e.target.value/100; gEst.eachLayer(l=>l.setOpacity(estOp)); };
+// classe do pixel clicado (lê a imagem já carregada)
+const canvasCache = {};
+function textoPixel(latlng){
+  if (!estOn) return '';
+  const prod = EST[estProd]; if (!prod) return '';
+  let alvo = null;
+  gEst.eachLayer(l=>{ if (!alvo && l.getBounds().contains(latlng)) alvo = l; });
+  if (!alvo) return '';
+  const img = alvo.getElement(); if (!img || !img.complete || !img.naturalWidth) return '';
+  const key = img.src;
+  if (!canvasCache[key]){
+    const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
+    const cx = c.getContext('2d', {willReadFrequently:true}); cx.drawImage(img,0,0); canvasCache[key] = cx;
+  }
+  const crs = L.CRS.EPSG3857, b = alvo.getBounds();
+  const p = crs.project(latlng), sw = crs.project(b.getSouthWest()), ne = crs.project(b.getNorthEast());
+  const x = Math.floor((p.x-sw.x)/(ne.x-sw.x)*img.naturalWidth), y = Math.floor((ne.y-p.y)/(ne.y-sw.y)*img.naturalHeight);
+  let px;
+  try { px = canvasCache[key].getImageData(Math.min(x,img.naturalWidth-1), Math.min(y,img.naturalHeight-1), 1, 1).data; }
+  catch(err){ return `<div class="pix">${prod.titulo} ${estAno}: a classe do pixel aparece na versão publicada (o navegador bloqueia a leitura em arquivo local).</div>`; }
+  if (px[3] === 0) return `<div class="pix">${prod.titulo} ${estAno}: sem classe neste ponto</div>`;
+  const hex = '#'+[px[0],px[1],px[2]].map(v=>v.toString(16).padStart(2,'0')).join('');
+  const k = Object.keys(prod.classes).find(k=>prod.classes[k].cor.toLowerCase()===hex);
+  return `<div class="pix"><i style="background:${hex}"></i>${prod.titulo} ${estAno}: <b>${k ? prod.classes[k].nome : 'classe não identificada'}</b></div>`;
+}
+map.on('click', e=>{
+  if (CAMADAS.mun.on) return;
+  const t = textoPixel(e.latlng); if (t) L.popup().setLatLng(e.latlng).setContent(t).openOn(map);
+});
+atualizarEstado();
+
+// ---------- busca ----------
+const porNome = {};
+MUNICIPIOS.features.forEach(f=>{ porNome[f.properties.nm.toLowerCase()] = f; });
+document.getElementById('listaMun').innerHTML = Object.values(porNome)
+  .map(f=>f.properties.nm).sort((a,b)=>a.localeCompare(b,'pt')).map(n=>`<option value="${n}">`).join('');
+document.getElementById('busca').addEventListener('change', e => {
+  const f = porNome[e.target.value.trim().toLowerCase()]; if(!f) return;
+  e.target.value = ''; e.target.placeholder = f.properties.nm + ' · buscar outro…'; e.target.blur();
+  ligar('mun', true);
+  const lyr = geo.getLayers().find(l=>l.feature===f);
+  map.flyToBounds(lyr.getBounds(), {duration:0.8, maxZoom:10, paddingTopLeft:[window.innerWidth>640?360:0,0]});
+  map.once('moveend', ()=>{
+    selecionado = f.properties.cd; geo.setStyle(estilo);
+    L.popup({autoPanPaddingTopLeft:[window.innerWidth>640?370:10,10], autoPanPaddingBottomRight:[70,10]}).setLatLng(lyr.getBounds().getCenter()).setContent(popup(f.properties)).openOn(map);
+    graficoMunicipio(f.properties);
+  });
+});
+
+// ---------- controles ----------
+const sl = document.getElementById('ano');
+function limitesAno(){
+  sl.step = 1;
+  if (camada==='mb'){ sl.min=1985; sl.max=2025; }
+  else if (camada==='dice'){ sl.min=2018; sl.max=2024; sl.step=2; }
+  else { sl.min=2013; sl.max = camada==='pevs' ? 2025 : 2024; }
+  ano = Math.min(Math.max(ano, +sl.min), +sl.max);
+  if (camada==='dice' && ano%2) ano -= 1;
+  sl.value = ano;
+}
+function atualizar(){
+  document.getElementById('anoLabel').textContent = ano;
+  geo.setStyle(estilo); legenda(); stats();
+  Chart.instances && Object.values(Chart.instances).forEach(c=>c.draw());
+  map.closePopup();
+}
+document.querySelectorAll('#camadas button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#camadas button').forEach(x=>x.classList.remove('on'));
+  b.classList.add('on'); camada=b.dataset.c; limitesAno(); atualizar();
+});
+sl.oninput = e => { ano = +e.target.value; atualizar(); };
+document.getElementById('toggle').onclick = () => {
+  const p=document.getElementById('painel'); p.classList.toggle('fechado');
+  document.getElementById('toggle').textContent = p.classList.contains('fechado') ? '+' : '−';
+};
+limitesAno(); atualizar();
+</script>
+</body>
+</html>
