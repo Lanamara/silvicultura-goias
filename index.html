@@ -76,6 +76,8 @@ h2.hi{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .info .formula{display:block;margin:6px 0;font-family:Georgia,serif;font-style:italic;font-size:13.5px;text-align:center}
 .info .ref{display:block;margin-top:8px;font-size:11.5px;color:var(--muted)}
 .info a{color:var(--accent)}
+a.pdf{display:inline-block;margin-top:8px;font-weight:600;color:var(--accent)}
+a.pdf::before{content:"";display:inline-block;width:9px;height:11px;margin-right:6px;vertical-align:-1px;border:1.5px solid currentColor;border-radius:1px}
 .serie{display:flex;align-items:center;gap:6px;font-size:12.5px;margin-bottom:6px}
 .serie select{font:inherit;padding:2px 4px;border:1px solid var(--line);border-radius:5px;background:#fff}
 .busca input{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:6px;font:inherit}
@@ -131,7 +133,8 @@ h2.hi{display:flex;align-items:center;justify-content:space-between;gap:8px}
         <span class="info-sub"><b>O que é o coeficiente de Dice.</b> É uma medida de semelhança entre dois conjuntos, proposta por Dice (1945) para a associação entre espécies e hoje muito usada para comparar mapas. Aqui os conjuntos são os pixels de 30 m classificados como silvicultura em cada mapa: <b>A</b> = área com silvicultura nos dois mapas, <b>B</b> = só no MapBiomas, <b>C</b> = só no TerraClass.
         <span class="formula">D = 2A / (2A + B + C)</span>
         Equivale à área em comum dividida pela média das áreas mapeadas pelos dois produtos. D = 1 quando os dois mapeiam exatamente os mesmos pixels; D = 0 quando não há nenhum pixel em comum. Exemplo: em Goiás, 2024, D = 0,54 indica que a área em comum corresponde a 54% da área média mapeada pelos dois produtos.</span>
-        <span class="ref">Referência: DICE, L. R. Measures of the amount of ecologic association between species. <i>Ecology</i>, v. 26, n. 3, p. 297–302, 1945. <a href="https://doi.org/10.2307/1932409" target="_blank" rel="noopener">doi.org/10.2307/1932409</a></span></div>
+        <span class="ref">Referência: DICE, L. R. Measures of the amount of ecologic association between species. <i>Ecology</i>, v. 26, n. 3, p. 297–302, 1945. <a href="https://doi.org/10.2307/1932409" target="_blank" rel="noopener">doi.org/10.2307/1932409</a></span>
+        <a class="pdf" href="docs/metodologia_dice.pdf" target="_blank" rel="noopener">Nota técnica: metodologia e uso do coeficiente de Dice (PDF)</a></div>
       <div class="seg" id="camadas">
         <button data-c="mb" class="on">MapBiomas</button>
         <button data-c="pevs">PEVS</button>
@@ -187,7 +190,7 @@ h2.hi{display:flex;align-items:center;justify-content:space-between;gap:8px}
         <thead><tr><th>Ano</th><th>Ambos (ha)</th><th>Só MB (ha)</th><th>Só TC (ha)</th><th>Dice</th></tr></thead>
         <tbody id="tabDice"></tbody>
       </table>
-      <div class="nota">Áreas em hectares (ha), somadas dos CSVs <code>MB11_TC_*_GO_nativo_moda</code> (iguais à Tabela 1 do artigo). Dice é adimensional, de 0 a 1.</div>
+      <div class="nota">Áreas em hectares (ha), somadas dos CSVs <code>MB11_TC_*_GO_nativo_moda</code> (iguais à Tabela 1 do artigo). Dice é adimensional, de 0 a 1. <a class="pdf" href="docs/metodologia_dice.pdf" target="_blank" rel="noopener">Nota técnica: metodologia e uso do coeficiente de Dice (PDF)</a></div>
     </section>
 
     <section>
