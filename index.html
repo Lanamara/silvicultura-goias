@@ -72,6 +72,10 @@ h2.hi{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .ib[aria-expanded=true]{background:var(--accent);border-color:var(--accent);color:#fff}
 .ib:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .info{font-size:12.5px;line-height:1.5;background:#f3f6f2;border:1px solid var(--line);border-radius:6px;padding:8px 10px;margin:0 0 10px;color:var(--ink)}
+.info .info-sub{display:block;margin-top:8px;padding-top:8px;border-top:1px solid var(--line)}
+.info .formula{display:block;margin:6px 0;font-family:Georgia,serif;font-style:italic;font-size:13.5px;text-align:center}
+.info .ref{display:block;margin-top:8px;font-size:11.5px;color:var(--muted)}
+.info a{color:var(--accent)}
 .serie{display:flex;align-items:center;gap:6px;font-size:12.5px;margin-bottom:6px}
 .serie select{font:inherit;padding:2px 4px;border:1px solid var(--line);border-radius:5px;background:#fff}
 .busca input{width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:6px;font:inherit}
@@ -123,7 +127,11 @@ h2.hi{display:flex;align-items:center;justify-content:space-between;gap:8px}
 
     <section>
       <h2 class="hi">O que o mapa municipal mostra<button class="ib" type="button" aria-label="Sobre esta seção" aria-expanded="false">i</button></h2>
-      <div class="info" hidden>Escolhe a variável que colore os 246 municípios. <b>MapBiomas</b>: área de silvicultura (classe 9 da Coleção 11, pixels de 30 m), somada pela área real dos pixels. <b>PEVS</b>: área total de florestas plantadas em 31/12 declarada por município ao IBGE (Tabela 5930); 2025 é preliminar. <b>MapBiomas − PEVS</b>: diferença em ha; positivo quando o MapBiomas mapeia mais área que a PEVS registra. <b>Dice MB × TC</b>: sobreposição espacial entre a silvicultura do MapBiomas e a do TerraClass Cerrado (2018, 2020, 2022, 2024), D = 2A/(2A+B+C), de 0 (nenhuma sobreposição) a 1 (sobreposição total). O controle <b>Ano</b> se ajusta ao período de cada variável.</div>
+      <div class="info" hidden>Escolhe a variável que colore os 246 municípios. <b>MapBiomas</b>: área de silvicultura (classe 9 da Coleção 11, pixels de 30 m), somada pela área real dos pixels. <b>PEVS</b>: área total de florestas plantadas em 31/12 declarada por município ao IBGE (Tabela 5930); 2025 é preliminar. <b>MapBiomas − PEVS</b>: diferença em ha; positivo quando o MapBiomas mapeia mais área que a PEVS registra. <b>Dice MB × TC</b>: concordância espacial entre a silvicultura do MapBiomas e a do TerraClass Cerrado (2018, 2020, 2022 e 2024). O controle <b>Ano</b> se ajusta ao período de cada variável.
+        <span class="info-sub"><b>O que é o coeficiente de Dice.</b> É uma medida de semelhança entre dois conjuntos, proposta por Dice (1945) para a associação entre espécies e hoje muito usada para comparar mapas. Aqui os conjuntos são os pixels de 30 m classificados como silvicultura em cada mapa: <b>A</b> = área com silvicultura nos dois mapas, <b>B</b> = só no MapBiomas, <b>C</b> = só no TerraClass.
+        <span class="formula">D = 2A / (2A + B + C)</span>
+        Equivale à área em comum dividida pela média das áreas mapeadas pelos dois produtos. D = 1 quando os dois mapeiam exatamente os mesmos pixels; D = 0 quando não há nenhum pixel em comum. Exemplo: em Goiás, 2024, D = 0,54 indica que a área em comum corresponde a 54% da área média mapeada pelos dois produtos.</span>
+        <span class="ref">Referência: DICE, L. R. Measures of the amount of ecologic association between species. <i>Ecology</i>, v. 26, n. 3, p. 297–302, 1945. <a href="https://doi.org/10.2307/1932409" target="_blank" rel="noopener">doi.org/10.2307/1932409</a></span></div>
       <div class="seg" id="camadas">
         <button data-c="mb" class="on">MapBiomas</button>
         <button data-c="pevs">PEVS</button>
@@ -176,10 +184,10 @@ h2.hi{display:flex;align-items:center;justify-content:space-between;gap:8px}
       <h2 class="hi">Concordância MapBiomas × TerraClass<button class="ib" type="button" aria-label="Sobre esta seção" aria-expanded="false">i</button></h2>
       <div class="info" hidden>Soma estadual das três situações de pixel (30 m): silvicultura nos dois mapas (Ambos, A), só no MapBiomas (B) e só no TerraClass (C), com o Dice correspondente. O TerraClass (10 m) foi agregado à grade do MapBiomas pela classe majoritária, excluindo a classe "não observado". Um Dice em queda indica que os dois mapeamentos concordam cada vez menos sobre onde há plantio.</div>
       <table>
-        <thead><tr><th>Ano</th><th>Ambos</th><th>Só MB</th><th>Só TC</th><th>Dice</th></tr></thead>
+        <thead><tr><th>Ano</th><th>Ambos (ha)</th><th>Só MB (ha)</th><th>Só TC (ha)</th><th>Dice</th></tr></thead>
         <tbody id="tabDice"></tbody>
       </table>
-      <div class="nota">Áreas em ha, somadas dos CSVs <code>MB11_TC_*_GO_nativo_moda</code> (iguais à Tabela 1 do artigo).</div>
+      <div class="nota">Áreas em hectares (ha), somadas dos CSVs <code>MB11_TC_*_GO_nativo_moda</code> (iguais à Tabela 1 do artigo). Dice é adimensional, de 0 a 1.</div>
     </section>
 
     <section>
@@ -309,9 +317,10 @@ map.fitBounds(geo.getBounds(), {paddingTopLeft:[window.innerWidth>640?360:0,0]})
 function legenda(){
   const c = camada==='dif' ? CLS.dif : camada==='dice' ? CLS.dice : CLS.area;
   document.getElementById('legTitulo').textContent =
-    camada==='dif' ? 'MapBiomas − PEVS (ha) · positivo: MB maior' :
-    camada==='dice' ? 'Dice MB × TC · 0 = nenhuma sobreposição, 1 = total' :
-    (camada==='mb'?'Área MapBiomas (ha)':'Área PEVS (ha)');
+    camada==='dif' ? 'Diferença entre a área de silvicultura do MapBiomas e da PEVS nos municípios (ha) · positivo: MapBiomas maior' :
+    camada==='dice' ? 'Concordância espacial da silvicultura entre MapBiomas e TerraClass nos municípios (coeficiente de Dice) · 0 = nenhuma sobreposição, 1 = total' :
+    camada==='mb' ? 'Área de silvicultura nos municípios mapeada pelo MapBiomas (ha)' :
+    'Área de florestas plantadas nos municípios registrada pela PEVS/IBGE (ha)';
   let h = c.cores.map((cor,i)=>`<i style="background:${cor}"></i><span>${c.rot[i]}</span>`).join('');
   if (camada==='dice') h += `<i style="background:#bdbdbd"></i><span>&lt; 50 ha nos dois mapeamentos</span>`;
   else if (camada!=='mb') h += `<i class="hatch"></i><span>Sem dado na PEVS</span>`;
