@@ -129,7 +129,7 @@ a.pdf::before{content:"";display:inline-block;width:9px;height:11px;margin-right
 
     <section>
       <h2 class="hi">O que o mapa municipal mostra<button class="ib" type="button" aria-label="Sobre esta seção" aria-expanded="false">i</button></h2>
-      <div class="info" hidden>Escolhe a variável que colore os 246 municípios. <b>MapBiomas</b>: área de silvicultura (classe 9 da Coleção 11, pixels de 30 m), somada pela área real dos pixels. <b>PEVS</b>: área total de florestas plantadas em 31/12 declarada por município ao IBGE (Tabela 5930); 2025 é preliminar. <b>MapBiomas − PEVS</b>: diferença em ha; positivo quando o MapBiomas mapeia mais área que a PEVS registra. <b>Dice MB × TC</b>: concordância espacial entre a silvicultura do MapBiomas e a do TerraClass Cerrado (2018, 2020, 2022 e 2024). O controle <b>Ano</b> se ajusta ao período de cada variável.
+      <div class="info" hidden>Escolhe a variável que colore os 246 municípios. <b>MapBiomas</b>: área de silvicultura (classe 9 da Coleção 11, pixels de 30 m), somada pela área real dos pixels. <b>PEVS</b>: área total de florestas plantadas em 31/12 declarada por município ao IBGE (Tabela 5930); 2025 é preliminar. <b>TerraClass</b>: área de silvicultura (classe 9) do TerraClass Cerrado em 2018, 2020, 2022 e 2024, agregada a 30 m pela classe majoritária e sem a classe "não observado"; cobre só a porção de cada município no bioma Cerrado. <b>MapBiomas − PEVS</b>: diferença em ha; positivo quando o MapBiomas mapeia mais área que a PEVS registra. <b>MapBiomas − TerraClass</b>: diferença em ha entre os dois mapeamentos, calculada na mesma área (porção no Cerrado com TerraClass válido), ou seja, área só no MapBiomas menos área só no TerraClass; positivo quando o MapBiomas mapeia mais. <b>Dice MB × TC</b>: concordância espacial entre a silvicultura do MapBiomas e a do TerraClass Cerrado (2018, 2020, 2022 e 2024). O controle <b>Ano</b> se ajusta ao período de cada variável.
         <span class="info-sub"><b>O que é o coeficiente de Dice.</b> É uma medida de semelhança entre dois conjuntos, proposta por Dice (1945) para a associação entre espécies e hoje muito usada para comparar mapas. Aqui os conjuntos são os pixels de 30 m classificados como silvicultura em cada mapa: <b>A</b> = área com silvicultura nos dois mapas, <b>B</b> = só no MapBiomas, <b>C</b> = só no TerraClass.
         <span class="formula">D = 2A / (2A + B + C)</span>
         Equivale à área em comum dividida pela média das áreas mapeadas pelos dois produtos. D = 1 quando os dois mapeiam exatamente os mesmos pixels; D = 0 quando não há nenhum pixel em comum. Exemplo: em Goiás, 2024, D = 0,54 indica que a área em comum corresponde a 54% da área média mapeada pelos dois produtos.</span>
@@ -138,7 +138,9 @@ a.pdf::before{content:"";display:inline-block;width:9px;height:11px;margin-right
       <div class="seg" id="camadas">
         <button data-c="mb" class="on">MapBiomas</button>
         <button data-c="pevs">PEVS</button>
+        <button data-c="tc">TerraClass</button>
         <button data-c="dif">MapBiomas − PEVS</button>
+        <button data-c="diftc">MapBiomas − TerraClass</button>
         <button data-c="dice">Dice MB × TC</button>
       </div>
       <div class="linha">
@@ -178,7 +180,7 @@ a.pdf::before{content:"";display:inline-block;width:9px;height:11px;margin-right
 
     <section id="secMun" hidden>
       <h2 class="hi">Município selecionado<button class="ib" type="button" aria-label="Sobre esta seção" aria-expanded="false">i</button></h2>
-      <div class="info" hidden>Série do município clicado ou buscado: MapBiomas em todos os anos e PEVS de 2013 a 2025. Lacunas na PEVS indicam anos em que o município não teve área registrada. O período segue o De/Até da série estadual.</div>
+      <div class="info" hidden>Série do município clicado ou buscado: MapBiomas em todos os anos, PEVS de 2013 a 2025 e TerraClass em 2018, 2020, 2022 e 2024 (porção no Cerrado). Lacunas na PEVS indicam anos em que o município não teve área registrada. O período segue o De/Até da série estadual.</div>
       <div id="munNome"></div>
       <div id="grafMun"><canvas id="cMun"></canvas></div>
     </section>
@@ -257,11 +259,15 @@ function valor(p){
   if (camada==='mb') return mb ?? null;
   if (camada==='pevs') return pv ?? null;
   if (camada==='dice') return dice(p);
+  if (camada==='tc' || camada==='diftc'){
+    const c = p.conc && p.conc[ano]; if (!c) return null;
+    return camada==='tc' ? c.a + c.c : c.b - c.c;
+  }
   return (pv==null || mb==null) ? null : mb - pv;
 }
 function estilo(f){
   const v = valor(f.properties);
-  const c = camada==='dif' ? CLS.dif : camada==='dice' ? CLS.dice : CLS.area;
+  const c = (camada==='dif'||camada==='diftc') ? CLS.dif : camada==='dice' ? CLS.dice : CLS.area;
   if (v==='pouco') return {fillColor:'#bdbdbd', fillOpacity: opac*0.7,
     color: f.properties.cd===selecionado?'#111':'#7a7a72', weight: f.properties.cd===selecionado?2.2:0.5};
   const semDado = v==null;
@@ -281,7 +287,9 @@ function popup(p){
   <table><tr><td>Ano</td><td>${ano}</td></tr>
   <tr><td>MapBiomas</td><td>${fmt(mb)} ha</td></tr>
   <tr><td>PEVS</td><td>${ano<2013 ? 'fora da série' : (pv==null?'sem dado':fmt(pv)+' ha')}</td></tr>
-  <tr><td>MB − PEVS</td><td>${dif==null?'—':(dif>0?'+':'')+fmt(dif)+' ha'}</td></tr></table>${popupConc(p)}`;
+  <tr><td>MB − PEVS</td><td>${dif==null?'—':(dif>0?'+':'')+fmt(dif)+' ha'}</td></tr>
+  ${p.conc && p.conc[ano] ? (()=>{const c=p.conc[ano], dt=c.b-c.c; return `<tr><td>TerraClass</td><td>${fmt(c.a+c.c)} ha</td></tr>
+  <tr><td>MB − TerraClass</td><td>${(dt>0?'+':'')+fmt(dt)} ha</td></tr>`;})() : ''}</table>${popupConc(p)}`;
 }
 const NOMES = {pas:'Pastagem', agr:'Agricultura', veg:'Vegetação nativa', mos:'Mosaico de usos', out:'Outros'};
 function popupConc(p){
@@ -318,15 +326,17 @@ map.fitBounds(geo.getBounds(), {paddingTopLeft:[window.innerWidth>640?360:0,0]})
 
 // ---------- legenda e estatísticas ----------
 function legenda(){
-  const c = camada==='dif' ? CLS.dif : camada==='dice' ? CLS.dice : CLS.area;
+  const c = (camada==='dif'||camada==='diftc') ? CLS.dif : camada==='dice' ? CLS.dice : CLS.area;
   document.getElementById('legTitulo').textContent =
     camada==='dif' ? 'Diferença entre a área de silvicultura do MapBiomas e da PEVS nos municípios (ha) · positivo: MapBiomas maior' :
     camada==='dice' ? 'Concordância espacial da silvicultura entre MapBiomas e TerraClass nos municípios (coeficiente de Dice) · 0 = nenhuma sobreposição, 1 = total' :
+    camada==='diftc' ? 'Diferença entre a área de silvicultura do MapBiomas e do TerraClass nos municípios, porção no Cerrado (ha) · positivo: MapBiomas maior' :
+    camada==='tc' ? 'Área de silvicultura nos municípios mapeada pelo TerraClass Cerrado (ha)' :
     camada==='mb' ? 'Área de silvicultura nos municípios mapeada pelo MapBiomas (ha)' :
     'Área de florestas plantadas nos municípios registrada pela PEVS/IBGE (ha)';
   let h = c.cores.map((cor,i)=>`<i style="background:${cor}"></i><span>${c.rot[i]}</span>`).join('');
   if (camada==='dice') h += `<i style="background:#bdbdbd"></i><span>&lt; 50 ha nos dois mapeamentos</span>`;
-  else if (camada!=='mb') h += `<i class="hatch"></i><span>Sem dado na PEVS</span>`;
+  else if (camada==='pevs' || camada==='dif') h += `<i class="hatch"></i><span>Sem dado na PEVS</span>`;
   document.getElementById('legenda').innerHTML = h;
 }
 
@@ -343,6 +353,18 @@ function stats(){
             <div class="stat"><b>${fmt(B)}</b><span>ha só no MapBiomas</span></div>
             <div class="stat"><b>${fmt(C)}</b><span>ha só no TerraClass</span></div>`;
     nota = 'Porção de Goiás no Cerrado; TerraClass agregado a 30 m pela classe majoritária, sem "não observado".';
+  } else if (camada==='tc' || camada==='diftc'){
+    const par = F.filter(p=>p.conc&&p.conc[ano]).map(p=>{const c=p.conc[ano]; return [c.a+c.b, c.a+c.c];});
+    const MBc = par.reduce((s,v)=>s+v[0],0), TCt = par.reduce((s,v)=>s+v[1],0);
+    const sel = par.filter(v=>v[0]>0 || v[1]>0), n = sel.length;
+    const mx = sel.reduce((s,a)=>s+a[0],0)/n, my = sel.reduce((s,a)=>s+a[1],0)/n;
+    let sxy=0,sxx=0,syy=0,se=0;
+    sel.forEach(([x,y])=>{sxy+=(x-mx)*(y-my);sxx+=(x-mx)**2;syy+=(y-my)**2;se+=(x-y)**2});
+    html = `<div class="stat"><b>${fmt(TCt)}</b><span>ha TerraClass</span></div>
+            <div class="stat"><b>${fmt(MBc)}</b><span>ha MapBiomas na mesma área</span></div>
+            <div class="stat"><b>${fmt((sxy*sxy)/(sxx*syy),2)}</b><span>R² municipal (n = ${n})</span></div>
+            <div class="stat"><b>${fmt(Math.sqrt(se/n))}</b><span>RMSE (ha)</span></div>`;
+    nota = 'Porção de Goiás no Cerrado com TerraClass válido. R² e RMSE comparam MapBiomas e TerraClass município a município, nos municípios com silvicultura em pelo menos um dos dois.';
   } else if (ano>=2013 && ano<=2024){
     const par = F.filter(p=>p.pevs[ano]!=null && p.mb[ano]!=null).map(p=>[p.mb[ano], p.pevs[ano]]);
     const n = par.length, mx = par.reduce((s,a)=>s+a[0],0)/n, my = par.reduce((s,a)=>s+a[1],0)/n;
@@ -394,7 +416,8 @@ function graficoMunicipio(p){
   document.getElementById('munNome').textContent = p.nm;
   const ds = [
     {label:'MapBiomas (ha)', data:anos.map(a=>p.mb[a]??null), borderColor:'#1a7f5a', pointRadius:0, borderWidth:2},
-    {label:'PEVS (ha)', data:anos.map(a=>p.pevs[a]??null), borderColor:'#c0562b', pointRadius:1.5, borderWidth:2, spanGaps:false}
+    {label:'PEVS (ha)', data:anos.map(a=>p.pevs[a]??null), borderColor:'#c0562b', pointRadius:1.5, borderWidth:2, spanGaps:false},
+    {label:'TerraClass (ha)', data:anos.map(a=>{const c=p.conc&&p.conc[a]; return c? c.a+c.c : null;}), borderColor:'#2c6fd1', backgroundColor:'#2c6fd1', pointRadius:3, borderWidth:1.5, spanGaps:true}
   ];
   if (chMun){ chMun.data.datasets = ds; aplicarPeriodo(); return; }
   chMun = new Chart(document.getElementById('cMun'), {type:'line', plugins:[linhaAno],
@@ -653,10 +676,10 @@ const sl = document.getElementById('ano');
 function limitesAno(){
   sl.step = 1;
   if (camada==='mb'){ sl.min=1985; sl.max=2025; }
-  else if (camada==='dice'){ sl.min=2018; sl.max=2024; sl.step=2; }
+  else if (camada==='dice' || camada==='tc' || camada==='diftc'){ sl.min=2018; sl.max=2024; sl.step=2; }
   else { sl.min=2013; sl.max = camada==='pevs' ? 2025 : 2024; }
   ano = Math.min(Math.max(ano, +sl.min), +sl.max);
-  if (camada==='dice' && ano%2) ano -= 1;
+  if ((camada==='dice' || camada==='tc' || camada==='diftc') && ano%2) ano -= 1;
   sl.value = ano;
 }
 function atualizar(){
